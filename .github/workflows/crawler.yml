@@ -1,25 +1,20 @@
 # config/crawler.yml
-# TrendRadar 增量爬虫配置文件（仅用于控制运行模式与权重）
+# 严格遵循你的要求：仅配置增量检测模式 + 权重
+# 检测平台已在 config/config.yaml 中配置，此处不重复定义
 
-# 全局配置
 global:
-  # 推送模式：incremental 表示仅当有新增热点时才推送
+  # 增量检测模式（只推送新出现的热点）
   report_mode: "incremental"
-
-  # 热点评分权重（按你的要求设定）
+  
+  # 热点评分权重（按你的要求精确配置）
   weight:
-    rank_weight: 0.4      # 适度看排名
-    frequency_weight: 0.5 # 重视当天内的持续热度
-    hotness_weight: 0.1   # 热度权重较低
-
-  # 是否启用去重（避免重复推送）
-  deduplicate: true
-
-  # 是否持久化历史数据（用于判断“是否新增”）
-  persist_history: true
-
-  # 是否启用通知（可选，若未配置则忽略）
-  notifier:
-    type: "telegram"        # 示例：Telegram 通知
-    chat_id: "your_chat_id"  # 替换为你的实际 ID
-    bot_token: "your_bot_token"  # 替换为你的 Bot Token
+    rank_weight: 0.4    # 适度看排名
+    frequency_weight: 0.5  # 重视当天内的持续热度
+    hotness_weight: 0.1   # 低权重处理绝对热度值
+  
+  # 必需的基础配置（保持默认行为）
+  deduplicate: true      # 启用去重
+  persist_history: true  # 保存历史记录（增量检测必需）
+  
+  # 通知配置（保留占位符，实际值从 config.yaml 读取）
+  notifier: {}
