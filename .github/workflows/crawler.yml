@@ -1,0 +1,55 @@
+name: Daily TrendRadar Crawler
+
+on:
+  schedule:
+    # 每天 UTC 00:00 运行（北京时间 08:00）
+    - cron: "0 0 * * *"
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install requests feedparser openai beautifulsoup4 python-dotenv
+
+      - name: Create output directory
+        run: mkdir -p output
+
+      - name: Run crawler
+        env:
+          LLM_PROVIDER: ${{ secrets.LLM_PROVIDER }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: gpt-4o-mini
+          FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
+          SOURCES: hn,producthunt
+          OUTPUT_DIR: ./output
+          LANGUAGE: zh
+        run: |
+          python main.py
+
+      - name: Commit and push results
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          
+          # 复制输出文件到根目录（可选）
+          cp output/*.md . 2>/dev/null || echo "No output files"
+          
+          # 提交更改
+          if [ -n "$(git status --porcelain)" ]; then
+            git add .
+            git commit -m "chore: update TrendRadar $(date +%Y-%m-%d)"
+            git push
+          else
+            echo "No changes to commit"
+          fi
