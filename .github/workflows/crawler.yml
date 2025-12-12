@@ -1,9 +1,9 @@
-name: Daily TrendRadar Crawler
+name: Hourly TrendRadar Crawler (8AM–10PM)
 
 on:
   schedule:
-    # 每天 UTC 00:00 运行（北京时间 08:00）
-    - cron: "0 0 * * *"
+    # 北京时间 8:00 到 22:00 每小时运行一次（UTC 0–14）
+    - cron: "0 0-14 * * *"
   workflow_dispatch:  # 允许手动触发
 
 jobs:
@@ -25,15 +25,16 @@ jobs:
       - name: Create output directory
         run: mkdir -p output
 
-      - name: Run crawler
+      - name: Run crawler with incremental mode via env var
         env:
           LLM_PROVIDER: ${{ secrets.LLM_PROVIDER }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: gpt-4o-mini
           FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          SOURCES: hn,producthunt
+          REPORT_MODE: incremental          # ← 覆盖 config.yaml 中的 mode
+          RANK_WEIGHT: "0.4"                # ← 覆盖权重（如果支持）
+          FREQUENCY_WEIGHT: "0.5"
+          HOTNESS_WEIGHT: "0.1"
           OUTPUT_DIR: ./output
           LANGUAGE: zh
         run: |
@@ -43,12 +44,9 @@ jobs:
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
-          
-          cp output/*.md . 2>/dev/null || echo "No output files to copy"
-          
+          git add .
           if [ -n "$(git status --porcelain)" ]; then
-            git add .
-            git commit -m "chore: update TrendRadar $(date +%Y-%m-%d)"
+            git commit -m "chore: update TrendRadar $(date +%Y-%m-%d %H:%M)"
             git push
           else
             echo "No changes to commit"
