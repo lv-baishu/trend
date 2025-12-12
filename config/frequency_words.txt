@@ -112,3 +112,104 @@ A股
 !体育赛事
 !地方节庆
 !文旅活动
+
+# 核心技术突破（必须包含 +）
++大模型
++多模态
++MoE
++Transformer
++扩散模型
++Agent
++推理框架
++模型蒸馏
++上下文学习
++世界模型
++具身智能
++神经符号系统
+
+# 重要机构与人物（避免泛AI，只盯头部）
+OpenAI
+Anthropic
+DeepMind
+Meta AI
+Google DeepMind
+Microsoft Research
+Apple AI
+华为盘古
+阿里通义
+百度文心
+智谱AI
+月之暗面
+清华
+北大
+MIT
+Stanford
+Yann LeCun
+Geoffrey Hinton
+Demis Hassabis
+Sam Altman
+
+# 硬件与算力
+英伟达
++H100
++A100
++Blackwell
++光刻机
++AI芯片
++存算一体
++量子计算
++超算
+
+# 政策、安全与伦理（高价值议题）
+AI监管
+人工智能法案
+AI安全
+对齐问题
+幻觉问题
+AI版权
+数据投毒
+模型窃取
+深度伪造
+AI军事化
+AI失业
+欧盟AI法案
+美国AI行政令
+中国生成式AI管理办法
+
+# 重大事件（非产品发布）
+GPT-5
+Claude 4
+Llama 4
+Gemini Ultra
+Sora
++Stable Diffusion 3
++AI登月计划
++AI发现新药
++AI预测蛋白质结构
++AI破解数学猜想
+
+# 全局过滤词（强力去噪）
+!AI工具
+!AI神器
+!AI写作
+!AI绘画
+!AI视频
+!AI换脸
+!AI配音
+!AI做图
+!AI创业
+!AI项目
+!AI应用
+!AI落地
+!AI赋能
+!AI解决方案
+!免费AI
+!国产AI
+!一键生成
+!效率神器
+!副业
+!变现
+!教程
+!测评
+!推荐
+!十大AI
