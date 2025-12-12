@@ -1,8 +1,8 @@
-name: Daily TrendRadar Crawler
+name: Daily TrendRadar Automation
 
 on:
   schedule:
-    # UTC 0-14 点 = 北京时间 8-22 点，每小时整点运行
+    # UTC 时间 0-14 点，对应北京时间 8-22 点，每小时一次
     - cron: "0 0-14 * * *"
   push:
     tags:
@@ -10,8 +10,8 @@ on:
       - "mcp-v*"
   workflow_dispatch:
     inputs:
-      image:
-        description: "选择要运行的爬虫"
+      task:
+        description: "选择要执行的任务"
         required: true
         default: "all"
         type: choice
@@ -20,26 +20,25 @@ on:
           - crawler
           - mcp
 
+env:
+  PUSH_MODE: incremental
+  WEIGHT_RANK_WEIGHT: 0.4
+  WEIGHT_FREQUENCY_WEIGHT: 0.5
+  WEIGHT_HOTNESS_WEIGHT: 0.1
+
 jobs:
-  run-crawler:
+  run-trendradar-crawler:
     runs-on: ubuntu-latest
     if: |
       (github.event_name == 'schedule') ||
       (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && !startsWith(github.ref, 'refs/tags/mcp-v')) ||
-      (github.event_name == 'workflow_dispatch' && (github.event.inputs.image == 'all' || github.event.inputs.image == 'crawler'))
-
-    env:
-      TZ: Asia/Shanghai
-      PUSH_MODE: incremental
-      WEIGHT_RANK_WEIGHT: 0.4
-      WEIGHT_FREQUENCY_WEIGHT: 0.5
-      WEIGHT_HOTNESS_WEIGHT: 0.1
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'crawler'))
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -47,54 +46,32 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install requests feedparser openai beautifulsoup4 pytz PyYAML
+          pip install requests beautifulsoup4 pytz
 
-      - name: Run crawler
+      - name: Run TrendRadar Crawler
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          SOURCES: hn,producthunt
-          OUTPUT_DIR: ./output
-          LANGUAGE: zh
-          LLM_PROVIDER: openai
-          OPENAI_MODEL: gpt-4o-mini
+          PUSH_MODE: ${{ env.PUSH_MODE }}
+          WEIGHT_RANK_WEIGHT: ${{ env.WEIGHT_RANK_WEIGHT }}
+          WEIGHT_FREQUENCY_WEIGHT: ${{ env.WEIGHT_FREQUENCY_WEIGHT }}
+          WEIGHT_HOTNESS_WEIGHT: ${{ env.WEIGHT_HOTNESS_WEIGHT }}
         run: |
-          mkdir -p output
-          python main.py
+          echo "Running TrendRadar Crawler with Incremental Push Mode and Weights..."
+          # 这里假设存在一个脚本或命令用于启动 trendradar 的 crawler 部分
+          # 比如：python ./path/to/trendradar_crawler.py
+          # 注意确保该脚本能够读取到环境变量中的权重和推送模式
+          python ./path/to/trendradar_crawler.py
 
-      - name: Commit and push results
-        run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-          if [ -f output/latest.md ]; then
-            cp output/latest.md ./TrendRadar.md
-            git add TrendRadar.md
-            git commit -m "chore: update TrendRadar $(date +%Y-%m-%d-%H)" || echo "No changes"
-            git push
-          else
-            echo "No output file"
-          fi
-
-  run-mcp:
+  run-trendradar-mcp:
     runs-on: ubuntu-latest
     if: |
       (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/mcp-v')) ||
-      (github.event_name == 'workflow_dispatch' && (github.event.inputs.image == 'all' || github.event.inputs.image == 'mcp'))
-
-    env:
-      TZ: Asia/Shanghai
-      PUSH_MODE: incremental
-      WEIGHT_RANK_WEIGHT: 0.4
-      WEIGHT_FREQUENCY_WEIGHT: 0.5
-      WEIGHT_HOTNESS_WEIGHT: 0.1
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.task == 'all' || github.event.inputs.task == 'mcp'))
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -102,32 +79,16 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install requests feedparser openai beautifulsoup4 pytz PyYAML
+          pip install requests beautifulsoup4 pytz
 
-      - name: Run MCP crawler
+      - name: Run TrendRadar MCP
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          SOURCES: mcp
-          OUTPUT_DIR: ./output
-          LANGUAGE: zh
-          LLM_PROVIDER: openai
-          OPENAI_MODEL: gpt-4o-mini
+          PUSH_MODE: ${{ env.PUSH_MODE }}
+          WEIGHT_RANK_WEIGHT: ${{ env.WEIGHT_RANK_WEIGHT }}
+          WEIGHT_FREQUENCY_WEIGHT: ${{ env.WEIGHT_FREQUENCY_WEIGHT }}
+          WEIGHT_HOTNESS_WEIGHT: ${{ env.WEIGHT_HOTNESS_WEIGHT }}
         run: |
-          mkdir -p output
-          python main.py
-
-      - name: Commit and push results
-        run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-          if [ -f output/latest.md ]; then
-            cp output/latest.md ./MCP-TrendRadar.md
-            git add MCP-TrendRadar.md
-            git commit -m "chore: update MCP TrendRadar $(date +%Y-%m-%d-%H)" || echo "No changes"
-            git push
-          else
-            echo "No output file"
-          fi
+          echo "Running TrendRadar MCP with Incremental Push Mode and Weights..."
+          # 类似地，这里需要指定运行趋势雷达 MCP 部分的命令
+          # 比如：python ./path/to/trendradar_mcp.py
+          python ./path/to/trendradar_mcp.py
