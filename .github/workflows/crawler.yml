@@ -20,7 +20,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install requests feedparser openai beautifulsoup4 python-dotenv
+          pip install requests feedparser openai beautifulsoup4 python-dotenv pytz
 
       - name: Create output directory
         run: mkdir -p output
@@ -31,6 +31,8 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: gpt-4o-mini
           FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           SOURCES: hn,producthunt
           OUTPUT_DIR: ./output
           LANGUAGE: zh
@@ -42,10 +44,10 @@ jobs:
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
           
-          # 复制输出文件到根目录（可选）
-          cp output/*.md . 2>/dev/null || echo "No output files"
+          # 尝试复制输出文件到根目录（便于查看）
+          cp output/*.md . 2>/dev/null || echo "No output files to copy"
           
-          # 提交更改
+          # 提交更改（如果有新文件）
           if [ -n "$(git status --porcelain)" ]; then
             git add .
             git commit -m "chore: update TrendRadar $(date +%Y-%m-%d)"
