@@ -1,42 +1,60 @@
-version: "3.0"
+name: Daily TrendRadar Crawler
 
-sources:
-  - hn
-  - producthunt
+on:
+  schedule:
+    # 每小时运行一次（UTC 时间），对应北京时间 08-23 点每小时一次
+    - cron: "0 * * * *"
+  workflow_dispatch:  # 允许手动触发
 
-output:
-  dir: "./output"
-  format: "markdown"
-  language: "zh"
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    env:
+      TZ: Asia/Shanghai  # 👈 关键：设置时区为北京时间
 
-llm:
-  provider: "openai"
-  model: "gpt-4o-mini"
-  max_tokens: 1500
-  temperature: 0.7
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-notifications:
-  feishu:
-    enabled: true
-    webhook_url: ""
-  telegram:
-    enabled: true
-    bot_token: ""
-    chat_id: ""
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-# === 关键：推送时间窗口（北京时间）===
-push_window:
-  enabled: true
-  start: "08:00"
-  end: "22:00"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests feedparser openai beautifulsoup4 python-dotenv pytz PyYAML
 
-# === 显式指定时区（如果代码支持）===
-timezone: "Asia/Shanghai"
+      - name: Create output directory
+        run: mkdir -p output
 
-proxy:
-  enabled: false
-  http: ""
-  https: ""
+      - name: Run crawler
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SOURCES: hn,producthunt
+          OUTPUT_DIR: ./output
+          LANGUAGE: zh
+          LLM_PROVIDER: openai
+          OPENAI_MODEL: gpt-4o-mini
+        run: |
+          python main.py
 
-debug: false
-user_agent: "TrendRadar-Crawler (+https://github.com/yourname/trendradar)"
+      - name: Commit and push results (if any)
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          
+          # 将 output 下的 .md 文件复制到根目录（方便查看）
+          cp output/*.md . 2>/dev/null || echo "No .md files to copy"
+          
+          if [ -n "$(git status --porcelain)" ]; then
+            git add .
+            git commit -m "chore: update TrendRadar $(date +%Y-%m-%d-%H)"
+            git push
+          else
+            echo "No changes to commit"
+          fi
