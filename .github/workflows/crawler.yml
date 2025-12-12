@@ -1,67 +1,38 @@
-name: Hourly TrendRadar Crawler
+version: "3.0"
 
-on:
-  schedule:
-    # 👇 修改1：每小时执行一次 (UTC时间每小时的第0分钟)
-    # 北京时间 = UTC + 8小时
-    - cron: "0 * * * *"
-  workflow_dispatch:  # 允许手动触发
+sources:
+  - hn
+  - producthunt
 
-jobs:
-  crawl:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+output:
+  dir: "./output"
+  format: "markdown"
+  language: "zh"
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+llm:
+  provider: "openai"
+  model: "gpt-4o-mini"
+  max_tokens: 1500
+  temperature: 0.7
 
-      - name: Install dependencies
-        run: |
-          pip install requests feedparser openai beautifulsoup4 python-dotenv pytz PyYAML
+notifications:
+  feishu:
+    enabled: true
+    webhook_url: ""
+  telegram:
+    enabled: true
+    bot_token: ""
+    chat_id: ""
 
-      - name: Create output directory
-        run: mkdir -p output
+push_window:
+  enabled: true   # ← 关键修改：从 false 改为 true
+  start: "08:00"
+  end: "22:00"
 
-      - name: Run crawler
-        env:
-          LLM_PROVIDER: ${{ secrets.LLM_PROVIDER }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_MODEL: gpt-4o-mini
-          FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          SOURCES: hn,producthunt
-          OUTPUT_DIR: ./output
-          LANGUAGE: zh
-          
-          # 👇 修改2：关键配置 - 覆盖配置文件中的设置
-          # 强制开启推送时间窗口控制（可选，为了明确）
-          PUSH_WINDOW_ENABLED: true
-          # 设置推送开始时间（北京时间）
-          PUSH_WINDOW_START: "00:00"
-          # 设置推送结束时间（北京时间），设为 23:59 即全天推送
-          PUSH_WINDOW_END: "23:59"
-          # 如果你想测试，可以暂时设为 false 来完全关闭时间检查
-          # PUSH_WINDOW_ENABLED: false
+proxy:
+  enabled: false
+  http: ""
+  https: ""
 
-        run: |
-          python main.py
-
-      - name: Commit and push results
-        run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-          
-          cp output/*.md . 2>/dev/null || echo "No output files to copy"
-          
-          if [ -n "$(git status --porcelain)" ]; then
-            git add .
-            git commit -m "chore: update TrendRadar $(date +%Y-%m-%d)"
-            git push
-          else:
-            echo "No changes to commit"
-          fi
+debug: false
+user_agent: "TrendRadar-Crawler (+https://github.com/yourname/trendradar)"
