@@ -2,61 +2,43 @@ name: Trend Radar Crawler
 
 on:
   schedule:
-    # 每6小时运行一次（UTC时间，可根据需要调整）
+    # 每6小时运行一次（UTC时间）
     - cron: '0 */6 * * *'
-  workflow_dispatch: # 允许手动触发工作流
-  push:
-    branches: [ main, master ]
-    paths:
-      - '.github/workflows/crawler.yml'
-      - 'config/**'
-      - 'crawler/**'
+  workflow_dispatch: # 允许手动触发
 
 jobs:
   crawl:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
-        fetch-depth: 0 # 获取完整历史记录
+        fetch-depth: 0
 
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.10'
-        cache: 'pip'
-        cache-dependency-path: 'requirements.txt'
 
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        # 安装额外可能需要的包
-        pip install requests beautifulsoup4 lxml feedparser pyyaml
 
     - name: Run crawler
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        # 添加其他需要的环境变量
-        # TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-        # TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       run: |
-        echo "开始执行爬虫任务..."
+        echo "Starting TrendRadar crawler..."
         python -m crawler.main --config config/config.yaml
-        echo "爬虫任务完成"
+        echo "Crawler completed."
 
     - name: Check for changes
       id: changes
       run: |
-        git status
-        if [ -n "$(git status --porcelain)" ]; then
-          echo "changes=true" >> $GITHUB_OUTPUT
-        else
-          echo "changes=false" >> $GITHUB_OUTPUT
-        fi
+        git status --porcelain | grep . > /dev/null && echo "changes=true" >> $GITHUB_OUTPUT || echo "changes=false" >> $GITHUB_OUTPUT
 
     - name: Commit and push results
       if: steps.changes.outputs.changes == 'true'
@@ -64,12 +46,5 @@ jobs:
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add .
-        git commit -m "Update trending data [skip ci]" || echo "Nothing to commit"
-        git push origin HEAD:${{ github.ref_name }} || echo "No changes to push"
-
-    - name: Notify on failure
-      if: failure()
-      uses: actions-cool/maintain-notification@v3
-      with:
-        webhook: ${{ secrets.NOTIFICATION_WEBHOOK }}
-        content: 'TrendRadar crawler failed!'
+        git commit -m "Update trending data [skip ci]"
+        git push origin HEAD:${{ github.ref_name }}
