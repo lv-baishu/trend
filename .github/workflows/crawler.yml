@@ -2,35 +2,13 @@ name: Daily TrendRadar Crawler
 
 on:
   schedule:
-    # UTC 00:00-14:00 = 北京时间 08:00-22:00，每小时整点运行
-    - cron: "0 0-14 * * *"
-  push:
-    tags:
-      - "v*"
-      - "mcp-v*"
-  workflow_dispatch:
-    inputs:
-      image:
-        description: "选择要运行的模块"
-        required: true
-        default: "all"
-        type: choice
-        options:
-          - all
-          - crawler
-          - mcp
-
-env:
-  TZ: Asia/Shanghai  # 设置时区为上海，确保时间判断正确
+    # 每天 UTC 00:00 运行（北京时间 08:00）
+    - cron: "0 0 * * *"
+  workflow_dispatch:  # 允许手动触发
 
 jobs:
-  run-crawler:
+  crawl:
     runs-on: ubuntu-latest
-    if: |
-      (github.event_name == 'schedule') ||
-      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && !startsWith(github.ref, 'refs/tags/mcp-v')) ||
-      (github.event_name == 'workflow_dispatch' && (github.event.inputs.image == 'all' || github.event.inputs.image == 'crawler'))
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -42,91 +20,36 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
-          pip install requests feedparser openai beautifulsoup4 pytz PyYAML
+          pip install requests feedparser openai beautifulsoup4 python-dotenv pytz PyYAML
 
-      - name: Run TrendRadar Crawler
+      - name: Create output directory
+        run: mkdir -p output
+
+      - name: Run crawler
         env:
-          PUSH_MODE: incremental
-          WEIGHT_RANK_WEIGHT: 0.4
-          WEIGHT_FREQUENCY_WEIGHT: 0.5
-          WEIGHT_HOTNESS_WEIGHT: 0.1
+          LLM_PROVIDER: ${{ secrets.LLM_PROVIDER }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: gpt-4o-mini
           FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           SOURCES: hn,producthunt
           OUTPUT_DIR: ./output
           LANGUAGE: zh
-          LLM_PROVIDER: openai
-          OPENAI_MODEL: gpt-4o-mini
         run: |
-          echo "Running TrendRadar Crawler with Incremental Mode..."
           python main.py
 
-      - name: Commit output to repo
+      - name: Commit and push results
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
-          mkdir -p ./output
-          if [ -f output/latest.md ]; then
-            cp output/latest.md ./TrendRadar.md
-            git add TrendRadar.md
-            git commit -m "chore: update TrendRadar $(date +%Y-%m-%d-%H)" || echo "No changes"
+          
+          cp output/*.md . 2>/dev/null || echo "No output files to copy"
+          
+          if [ -n "$(git status --porcelain)" ]; then
+            git add .
+            git commit -m "chore: update TrendRadar $(date +%Y-%m-%d)"
             git push
           else
-            echo "No output generated"
-          fi
-
-  run-mcp:
-    runs-on: ubuntu-latest
-    if: |
-      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/mcp-v')) ||
-      (github.event_name == 'workflow_dispatch' && (github.event.inputs.image == 'all' || github.event.inputs.image == 'mcp'))
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install requests feedparser openai beautifulsoup4 pytz PyYAML
-
-      - name: Run TrendRadar MCP
-        env:
-          PUSH_MODE: incremental
-          WEIGHT_RANK_WEIGHT: 0.4
-          WEIGHT_FREQUENCY_WEIGHT: 0.5
-          WEIGHT_HOTNESS_WEIGHT: 0.1
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          SOURCES: mcp
-          OUTPUT_DIR: ./output
-          LANGUAGE: zh
-          LLM_PROVIDER: openai
-          OPENAI_MODEL: gpt-4o-mini
-        run: |
-          echo "Running TrendRadar MCP with Incremental Mode..."
-          python main.py
-
-      - name: Commit output to repo
-        run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-          mkdir -p ./output
-          if [ -f output/latest.md ]; then
-            cp output/latest.md ./MCP-TrendRadar.md
-            git add MCP-TrendRadar.md
-            git commit -m "chore: update MCP TrendRadar $(date +%Y-%m-%d-%H)" || echo "No changes"
-            git push
-          else
-            echo "No output generated"
+            echo "No changes to commit"
           fi
