@@ -1,9 +1,10 @@
-name: Hourly TrendRadar Crawler (8AM–10PM)
+name: Hourly TrendRadar Crawler
 
 on:
   schedule:
-    # 北京时间 8:00 到 22:00 每小时运行一次（UTC 0–14）
-    - cron: "0 0-14 * * *"
+    # 👇 修改1：每小时执行一次 (UTC时间每小时的第0分钟)
+    # 北京时间 = UTC + 8小时
+    - cron: "0 * * * *"
   workflow_dispatch:  # 允许手动触发
 
 jobs:
@@ -25,49 +26,42 @@ jobs:
       - name: Create output directory
         run: mkdir -p output
 
-      - name: Patch config.yaml for incremental mode and custom weights
-        run: |
-          # 确保 config 目录存在（有些仓库可能没有）
-          mkdir -p config
-          # 如果 config.yaml 不存在，创建一个最小版本
-          if [ ! -f config/config.yaml ]; then
-            echo "report:" > config/config.yaml
-            echo "  mode: daily" >> config/config.yaml
-            echo "weight:" >> config/config.yaml
-            echo "  rank_weight: 0.6" >> config/config.yaml
-            echo "  frequency_weight: 0.3" >> config/config.yaml
-            echo "  hotness_weight: 0.1" >> config/config.yaml
-          fi
-          # 动态修改配置（临时生效，不污染仓库）
-          sed -i 's/mode: .*/mode: "incremental"/' config/config.yaml
-          sed -i 's/rank_weight: .*/rank_weight: 0.4/' config/config.yaml
-          sed -i 's/frequency_weight: .*/frequency_weight: 0.5/' config/config.yaml
-          sed -i 's/hotness_weight: .*/hotness_weight: 0.1/' config/config.yaml
-
       - name: Run crawler
         env:
           LLM_PROVIDER: ${{ secrets.LLM_PROVIDER }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: gpt-4o-mini
           FEISHU_WEBHOOK_URL: ${{ secrets.FEISHU_WEBHOOK_URL }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SOURCES: hn,producthunt
           OUTPUT_DIR: ./output
           LANGUAGE: zh
+          
+          # 👇 修改2：关键配置 - 覆盖配置文件中的设置
+          # 强制开启推送时间窗口控制（可选，为了明确）
+          PUSH_WINDOW_ENABLED: true
+          # 设置推送开始时间（北京时间）
+          PUSH_WINDOW_START: "00:00"
+          # 设置推送结束时间（北京时间），设为 23:59 即全天推送
+          PUSH_WINDOW_END: "23:59"
+          # 如果你想测试，可以暂时设为 false 来完全关闭时间检查
+          # PUSH_WINDOW_ENABLED: false
+
         run: |
           python main.py
 
-      - name: Commit and push results (non-fatal on failure)
+      - name: Commit and push results
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
-
-          # 尝试复制输出文件（静默失败）
-          cp output/*.md . 2>/dev/null || true
-
-          # 如果有变更，尝试提交（失败也不中断）
+          
+          cp output/*.md . 2>/dev/null || echo "No output files to copy"
+          
           if [ -n "$(git status --porcelain)" ]; then
             git add .
-            git commit -m "chore: update TrendRadar $(date +%Y-%m-%d %H:%M)" || true
-            git push || echo "⚠️ Git push failed (non-fatal). Crawler succeeded."
-          else
-            echo "✅ No changes to commit"
+            git commit -m "chore: update TrendRadar $(date +%Y-%m-%d)"
+            git push
+          else:
+            echo "No changes to commit"
           fi
